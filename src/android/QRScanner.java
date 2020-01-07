@@ -29,8 +29,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.ArrayList;
 import java.util.List;
 
 
@@ -60,7 +60,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
     private boolean oneTime = true;
     private boolean keepDenied = false;
     private boolean appPausedWithActivePreview = false;
-    
+
     static class QRScannerError {
         private static final int UNEXPECTED_ERROR = 0,
                 CAMERA_ACCESS_DENIED = 1,
@@ -451,11 +451,27 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
             @Override
             public void run() {
                 // Create our Preview view and set it as the content of our activity.
-                mBarcodeView = new BarcodeView(cordova.getActivity());
+                mBarcodeView = new BarcodePreview(cordova.getActivity());
 
                 //Configure the decoder
-                ArrayList<BarcodeFormat> formatList = new ArrayList<BarcodeFormat>();
-                formatList.add(BarcodeFormat.QR_CODE);
+                List<BarcodeFormat> formatList = Arrays.asList(BarcodeFormat.AZTEC,
+                    BarcodeFormat.CODABAR,
+                    BarcodeFormat.CODE_39,
+                    BarcodeFormat.CODE_93,
+                    BarcodeFormat.CODE_128,
+                    BarcodeFormat.DATA_MATRIX,
+                    BarcodeFormat.EAN_8,
+                    BarcodeFormat.EAN_13,
+                    BarcodeFormat.ITF,
+                    BarcodeFormat.MAXICODE,
+                    BarcodeFormat.PDF_417,
+                    BarcodeFormat.QR_CODE,
+                    BarcodeFormat.RSS_14,
+                    BarcodeFormat.RSS_EXPANDED,
+                    BarcodeFormat.UPC_A,
+                    BarcodeFormat.UPC_E,
+                    BarcodeFormat.UPC_EAN_EXTENSION
+                );
                 mBarcodeView.setDecoderFactory(new DefaultDecoderFactory(formatList, null, null));
 
                 //Configure the camera (front/back)
@@ -641,7 +657,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                     if(lightOn)
                         lightOn = false;
                 }
-                
+
                 if (callbackContext != null)
                     getStatus(callbackContext);
             }
@@ -659,7 +675,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                     if(switchFlashOn)
                         lightOn = true;
                 }
-                
+
                 if (callbackContext != null)
                     getStatus(callbackContext);
             }
