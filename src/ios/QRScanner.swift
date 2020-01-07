@@ -86,23 +86,6 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             (videoPreviewLayer.session?.outputs.first(where: { $0 is AVCaptureMetadataOutput }) as? AVCaptureMetadataOutput)?.rectOfInterest = rectOfInterest
         }
     }
-
-    let supportedQRTypes: [AVMetadataObject.ObjectType] = [
-        .qr,
-        .aztec,
-        .code128,
-        .code39,
-        .code39Mod43,
-        .code39,
-        .code93,
-        .dataMatrix,
-        .ean13,
-        .ean8,
-        .interleaved2of5,
-        .itf14,
-        .pdf417,
-        .upce
-    ]
     
     lazy var cameraView: CameraView = {
         let frame = webView?.bounds ?? UIScreen.main.bounds
@@ -208,7 +191,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 let metaOutput = AVCaptureMetadataOutput()
                 session.addOutput(metaOutput)
                 metaOutput.setMetadataObjectsDelegate(self, queue: .main)
-                metaOutput.metadataObjectTypes = supportedQRTypes
+                metaOutput.metadataObjectTypes = metaOutput.availableMetadataObjectTypes
                 let captureVideoPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
                 cameraView.addPreviewLayer(captureVideoPreviewLayer)
                 
@@ -290,7 +273,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             return
         }
         
-        if supportedQRTypes.contains(object.type), let stringValue = object.stringValue {
+        if captureOutput.metadataObjectTypes.contains(object.type), let stringValue = object.stringValue {
             isScanning = false
             let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: stringValue)
             commandDelegate?.send(pluginResult, callbackId: nextScanningCommand?.callbackId)
@@ -478,7 +461,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     @objc func openSettings(_ command: CDVInvokedUrlCommand) {
-        guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
+        guard let settingsUrl = URL(string: UIApplicationOpenSettingsURLString) else {
             sendErrorCode(command: command, error: .openSettingsUnavailable)
             return
         }
