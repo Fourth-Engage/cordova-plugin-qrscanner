@@ -28,13 +28,12 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             
             guard layer === self.layer else { return }
             layer.sublayers?.forEach { $0.frame = bounds }
-            videoPreviewLayer?.connection?.videoOrientation = interfaceOrientationToVideoOrientation(UIApplication.shared.statusBarOrientation)
+            
+            if videoPreviewLayer?.connection?.isVideoOrientationSupported == true {
+                videoPreviewLayer?.connection?.videoOrientation = interfaceOrientationToVideoOrientation(UIApplication.shared.statusBarOrientation)
+            }
+            
             updateRectOfInterest()
-        }
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            videoPreviewLayer?.connection?.videoOrientation = interfaceOrientationToVideoOrientation(UIApplication.shared.statusBarOrientation)
         }
         
         func addPreviewLayer(_ previewLayer:AVCaptureVideoPreviewLayer) {
@@ -71,11 +70,11 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 return
             case 0...600:
                 scanRect.origin.x = 16
-                scanRect.origin.y = 48
+                scanRect.origin.y = 38
                 scanRect.size.width = bounds.insetBy(dx: scanRect.origin.x, dy: 0).width
             case 600...:
                 scanRect.size.width = 568
-                scanRect.origin.y = 60
+                scanRect.origin.y = 34
                 scanRect.origin.x = (bounds.width - scanRect.width) / 2
             default:
                 return
@@ -88,9 +87,8 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
     
     lazy var cameraView: CameraView = {
-        let frame = webView?.bounds ?? UIScreen.main.bounds
+        let frame = UIScreen.main.bounds
         let cameraView = CameraView(frame: CGRect(x: 0, y: 0, width: frame.width, height: frame.height))
-        cameraView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         return cameraView
     }()
     
@@ -152,17 +150,6 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         commandDelegate?.send(pluginResult, callbackId:command.callbackId)
     }
 
-    // utility method
-    @objc static func backgroundThread(delay: Double = 0.0, background: (() -> Void)? = nil, completion: (() -> Void)? = nil) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            background?()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                completion?()
-            }
-        }
-    }
-
     @objc func prepScanner(command: CDVInvokedUrlCommand) -> Bool{
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .restricted:
@@ -178,6 +165,12 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         do {
             if captureSession?.isRunning != true {
                 webView?.superview?.insertSubview(cameraView, belowSubview: webView!)
+                cameraView.translatesAutoresizingMaskIntoConstraints = false
+                cameraView.topAnchor.constraint(equalTo: webView.topAnchor).isActive = true
+                cameraView.bottomAnchor.constraint(equalTo: webView.bottomAnchor).isActive = true
+                cameraView.leadingAnchor.constraint(equalTo: webView.leadingAnchor).isActive = true
+                cameraView.trailingAnchor.constraint(equalTo: webView.trailingAnchor).isActive = true
+                
                 backCamera = Camera.back.device
                 frontCamera = Camera.front.device
                 
@@ -301,7 +294,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         
         AVCaptureDevice.requestAccess(for: .video) { (granted) in
             // attempt to prepScanner only after the request returns
-            Self.backgroundThread(completion: prepareClosure)
+            DispatchQueue.main.async(execute: prepareClosure)
         }
     }
 
@@ -411,18 +404,16 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             return
         }
         
-        Self.backgroundThread(
-            background: { [weak self] in
-                self?.captureSession?.stopRunning()
-                self?.cameraView.removePreviewLayer()
-                self?.captureVideoPreviewLayer = nil
-                self?.metaOutput = nil
-                self?.captureSession = nil
-                self?.currentCamera = .back
-                self?.frontCamera = nil
-                self?.backCamera = nil
-            }
-        ) { [weak self] in self?.getStatus(command) }
+        captureSession?.stopRunning()
+        cameraView.removePreviewLayer()
+        captureVideoPreviewLayer = nil
+        metaOutput = nil
+        captureSession = nil
+        currentCamera = .back
+        frontCamera = nil
+        backCamera = nil
+        
+        getStatus(command)
     }
 
     @objc func getStatus(_ command: CDVInvokedUrlCommand){
