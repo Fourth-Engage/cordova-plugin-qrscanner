@@ -9,6 +9,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         override init(frame: CGRect) {
             super.init(frame: frame)
             backgroundColor = .clear
+            NotificationCenter.default.addObserver(self, selector: #selector(keyboardDidChangeFrame), name: .UIKeyboardDidChangeFrame, object: nil)
         }
         
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -83,6 +84,11 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             scanRect.size.height = scanRect.width/2
             let rectOfInterest = videoPreviewLayer.metadataOutputRectConverted(fromLayerRect: scanRect)
             (videoPreviewLayer.session?.outputs.first(where: { $0 is AVCaptureMetadataOutput }) as? AVCaptureMetadataOutput)?.rectOfInterest = rectOfInterest
+        }
+        
+        @objc private func keyboardDidChangeFrame(_ notification: Notification) {
+            layer.setNeedsLayout()
+            layer.layoutIfNeeded()
         }
     }
     
@@ -452,7 +458,14 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     @objc func openSettings(_ command: CDVInvokedUrlCommand) {
-        guard let settingsUrl = URL(string: UIApplicationOpenSettingsURLString) else {
+        let urlString: String
+        #if swift(>=5)
+            urlString = UIApplication.openSettingsURLString
+        #else
+            urlString = UIApplicationOpenSettingsURLString
+        #endif
+        
+        guard let settingsUrl = URL(string: urlString) else {
             sendErrorCode(command: command, error: .openSettingsUnavailable)
             return
         }
