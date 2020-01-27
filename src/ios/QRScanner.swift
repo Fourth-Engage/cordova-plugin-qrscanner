@@ -37,6 +37,14 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             updateRectOfInterest()
         }
         
+        func pause() {
+            videoPreviewLayer?.connection?.isEnabled = false
+        }
+        
+        func resume() {
+            videoPreviewLayer?.connection?.isEnabled = true
+        }
+        
         func addPreviewLayer(_ previewLayer:AVCaptureVideoPreviewLayer) {
             previewLayer.videoGravity = .resizeAspectFill
             previewLayer.frame = bounds
@@ -145,10 +153,21 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             }
         }
     }
+    
+    enum TorchMode {
+        case on
+        case off
+        case unavailable
+    }
+    
+    private var initialWebViewState: (isOpaque: Bool, backgroundColor: UIColor?)?
+    private var torchMode = TorchMode.off
 
     override func pluginInitialize() {
         super.pluginInitialize()
-        NotificationCenter.default.addObserver(self, selector: #selector(pageDidLoad), name: NSNotification.Name.CDVPageDidLoad, object: nil)
+        initialWebViewState = (webView.isOpaque, webView.backgroundColor)
+        NotificationCenter.default.addObserver(self, selector: #selector(pageDidLoad), name: .CDVPageDidLoad, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive), name: .UIApplicationDidBecomeActive, object: nil)
     }
 
     func sendErrorCode(command: CDVInvokedUrlCommand, error: QRScannerError){
@@ -236,26 +255,46 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             throw CaptureError.couldNotCaptureInput(error: error as NSError)
         }
     }
-
-    @objc func makeOpaque(){
-        webView?.isOpaque = false
+    
+    private func executeHide() {
+        webView?.backgroundColor = initialWebViewState?.backgroundColor
+        webView?.isOpaque = initialWebViewState?.isOpaque ?? true
+        
+        cameraView.pause()
+        cameraView.isHidden = true
+    }
+    
+    private func executeShow() {
         webView?.backgroundColor = .clear
+        webView?.isOpaque = false
+        
+        cameraView.resume()
+        cameraView.isHidden = false
+    }
+    
+    private func setTorchMode(_ torchMode: TorchMode) throws {
+        guard torchMode != .unavailable else { throw LightError.torchUnavailable }
+        
+        let mode: AVCaptureDevice.TorchMode = {
+            return torchMode == .on ? .on : .off
+        }()
+        
+        // torch is only available for back camera
+        guard backCamera != nil, backCamera?.hasTorch == true, backCamera?.isTorchAvailable == true, backCamera?.isTorchModeSupported(mode) == true else {
+            self.torchMode = .unavailable
+            throw LightError.torchUnavailable
+        }
+        
+        self.torchMode = .off
+        try backCamera?.lockForConfiguration()
+        backCamera?.torchMode = mode
+        backCamera?.unlockForConfiguration()
+        self.torchMode = torchMode
     }
 
     @objc func configureLight(command: CDVInvokedUrlCommand, state: Bool) {
-        let mode: AVCaptureDevice.TorchMode = {
-            return state ? .on : .off
-        }()
-
         do {
-            // torch is only available for back camera
-            guard backCamera != nil, backCamera?.hasTorch == true, backCamera?.isTorchAvailable == true, backCamera?.isTorchModeSupported(mode) == true else {
-                throw LightError.torchUnavailable
-            }
-            
-            try backCamera?.lockForConfiguration()
-            backCamera?.torchMode = mode
-            backCamera?.unlockForConfiguration()
+            try setTorchMode(state ? .on : .off)
             getStatus(command)
         } catch LightError.torchUnavailable {
             sendErrorCode(command: command, error: .lightUnavailable)
@@ -280,9 +319,12 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         }
     }
 
-    @objc func pageDidLoad() {
-        webView?.isOpaque = false
-        webView?.backgroundColor = .clear
+    @objc private func pageDidLoad() {
+        executeShow()
+    }
+    
+    @objc private func applicationDidBecomeActive(_ notification: Notification) {
+        try? setTorchMode(torchMode)
     }
 
     //MARK: - EXTERNAL API
@@ -322,13 +364,12 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     @objc func show(_ command: CDVInvokedUrlCommand) {
-        webView?.isOpaque = false
-        webView?.backgroundColor = .clear
+        executeShow()
         getStatus(command)
     }
 
     @objc func hide(_ command: CDVInvokedUrlCommand) {
-        makeOpaque()
+        executeHide()
         getStatus(command)
     }
 
@@ -403,7 +444,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     @objc func destroy(_ command: CDVInvokedUrlCommand) {
-        makeOpaque()
+        executeHide()
         
         guard captureSession != nil else {
             getStatus(command)
