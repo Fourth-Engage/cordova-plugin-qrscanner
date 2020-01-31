@@ -164,6 +164,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     private var torchMode = TorchMode.off
 
     override func pluginInitialize() {
+        torchMode = .off
         super.pluginInitialize()
         initialWebViewState = (webView.isOpaque, webView.backgroundColor)
         NotificationCenter.default.addObserver(self, selector: #selector(pageDidLoad), name: .CDVPageDidLoad, object: nil)
