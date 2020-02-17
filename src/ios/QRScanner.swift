@@ -380,7 +380,11 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             isScanning = false
         }
         
+        let torchModeTemp = torchMode
+        try? setTorchMode(.off)
+        torchMode = torchModeTemp
         captureVideoPreviewLayer?.connection?.isEnabled = false
+        
         getStatus(command)
     }
 
@@ -391,6 +395,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         }
         
         captureVideoPreviewLayer?.connection?.isEnabled = true
+        try? setTorchMode(torchMode)
         getStatus(command)
     }
 
@@ -473,7 +478,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         let previewing = captureVideoPreviewLayer?.connection?.isEnabled == true
         let showing = webView?.backgroundColor == .clear
         let lightEnabled = backCamera?.torchMode == .on
-        let canEnableLight = backCamera?.hasTorch == true && backCamera?.isTorchAvailable == true && backCamera?.isTorchModeSupported(.on) == true
+        let canEnableLight = backCamera?.hasTorch == true
         let canChangeCamera = backCamera != nil && frontCamera != nil
         
         func boolToNumberString(bool: Bool) -> String {
