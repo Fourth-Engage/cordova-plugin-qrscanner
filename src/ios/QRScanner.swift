@@ -167,7 +167,6 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         torchMode = .off
         super.pluginInitialize()
         initialWebViewState = (webView.isOpaque, webView.backgroundColor)
-        NotificationCenter.default.addObserver(self, selector: #selector(pageDidLoad), name: .CDVPageDidLoad, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive), name: .UIApplicationDidBecomeActive, object: nil)
     }
 
@@ -319,10 +318,6 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             nextScanningCommand = nil
         }
     }
-
-    @objc private func pageDidLoad() {
-        executeShow()
-    }
     
     @objc private func applicationDidBecomeActive(_ notification: Notification) {
         try? setTorchMode(torchMode)
@@ -380,7 +375,11 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             isScanning = false
         }
         
+        let torchModeTemp = torchMode
+        try? setTorchMode(.off)
+        torchMode = torchModeTemp
         captureVideoPreviewLayer?.connection?.isEnabled = false
+        
         getStatus(command)
     }
 
@@ -391,6 +390,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         }
         
         captureVideoPreviewLayer?.connection?.isEnabled = true
+        try? setTorchMode(torchMode)
         getStatus(command)
     }
 
@@ -473,7 +473,7 @@ final class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         let previewing = captureVideoPreviewLayer?.connection?.isEnabled == true
         let showing = webView?.backgroundColor == .clear
         let lightEnabled = backCamera?.torchMode == .on
-        let canEnableLight = backCamera?.hasTorch == true && backCamera?.isTorchAvailable == true && backCamera?.isTorchModeSupported(.on) == true
+        let canEnableLight = backCamera?.hasTorch == true
         let canChangeCamera = backCamera != nil && frontCamera != nil
         
         func boolToNumberString(bool: Bool) -> String {
